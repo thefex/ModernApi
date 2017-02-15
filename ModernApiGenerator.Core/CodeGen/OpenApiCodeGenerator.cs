@@ -73,18 +73,19 @@ namespace ModernApiGenerator.Core.CodeGen
 		protected virtual CompilationUnitSyntax BuildDataModelCompilationUnitSytanx(DataDefinition dataDefinition)
 		{
 			NamespaceDeclarationSyntax namespaceDeclaration = SF.NamespaceDeclaration(SF.IdentifierName(DataNamespace));
-			
-			var compilationUnitSyntax = SF.CompilationUnit()
-				.AddUsings(SF.UsingDirective(SF.IdentifierName("System")))
-				.AddUsings(SF.UsingDirective(SF.IdentifierName("System.Collections.Generic")))
-				.AddMembers(namespaceDeclaration);
 
-			ClassDeclarationSyntax classDeclarationSyntax = SF.ClassDeclaration(dataDefinition.Name);
+		    var compilationUnitSyntax = SF.CompilationUnit()
+		        .AddUsings(SF.UsingDirective(SF.IdentifierName("System")))
+		        .AddUsings(SF.UsingDirective(SF.IdentifierName("System.Collections.Generic")));
 
-			foreach (var dataDefinitionProperty in dataDefinition.Properties)
-				classDeclarationSyntax = classDeclarationSyntax.AddMembers(_configuration.PropertyBuilder.BuildParameterSyntax(dataDefinitionProperty));
+		    ClassDeclarationSyntax classDeclarationSyntax = SF.ClassDeclaration(dataDefinition.Name);
 
-			return compilationUnitSyntax.AddMembers(classDeclarationSyntax);
+		    foreach (var dataDefinitionProperty in dataDefinition.Properties)
+		        classDeclarationSyntax =
+                    classDeclarationSyntax.AddMembers(_configuration.PropertyBuilder.BuildParameterSyntax(dataDefinitionProperty));
+
+		    namespaceDeclaration = namespaceDeclaration.AddMembers(classDeclarationSyntax);
+		    return compilationUnitSyntax.AddMembers(namespaceDeclaration);
 		}
 
 		protected abstract CompilationUnitSyntax BuildMethodDefinitionCompilationUnitSyntax(ApiResourceDefinition methodDefinition);

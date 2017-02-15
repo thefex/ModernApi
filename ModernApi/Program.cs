@@ -4,6 +4,7 @@ using ModernApiGenerator.Core.ApiSpecificationProvider;
 using ModernApiGenerator.Core.CodeGen;
 using ModernApiGenerator.Core.CodeGen.Builders;
 using ModernApiGenerator.Core.Data.CodeGen;
+using ModernApiGenerator.Core.GeneratorOutput;
 using ModernApiGenerator.Core.Processor;
 
 namespace ModernApi
@@ -21,8 +22,12 @@ namespace ModernApi
                 var generatorService = BuildGeneratorService();
 
 
-                Console.WriteLine("Przemysław Raciborski [thefex] - Swagger/OpenAPI Refit Code Generator " + versionBase +
-                                  "." + versionRevision);
+                Console.WriteLine(
+                    $"Przemysław Raciborski [thefex] - Swagger/OpenAPI Refit Code Generator {versionBase}.{versionRevision}");
+
+                args = new string[]
+                {"http://theapistack.com/data/bluemixinfo/bluemix-news-aggregation-api-openapi-spec.json", "C:/MySecretProject/API/"};
+#if DEBUG
                 if (args.Length != 2)
                 {
                     Console.ForegroundColor = ConsoleColor.Red;
@@ -37,6 +42,7 @@ namespace ModernApi
                         "ModernApi.exe https://raw.githubusercontent.com/OAI/OpenAPI-Specification/master/examples/v2.0/json/petstore.json C:/MySecretProject/API/");
                     return;
                 }
+#endif
 
                 var path = args[0];
                 var specificationProvider = new SpecificationProviderFactory().Build(path);
@@ -49,7 +55,24 @@ namespace ModernApi
                     return;
                 }
 
-                Console.WriteLine("Successfully generated API!");
+                var generatedApiOutputPath = args[1];
+                ApiCodeGeneratorProjectGenerator csprojGenerator =
+                    new ApiCodeGeneratorProjectGenerator(new OutputProjectConfiguration()
+                    {
+                        ProjectName = "Test",
+                        OutputPath = generatedApiOutputPath
+                    });
+
+                var csprojGenerationResponse = csprojGenerator.CreateProject(outputResponse.Results).Result;
+
+                if (!csprojGenerationResponse.IsSuccess)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine(outputResponse.FormattedErrorMessages);
+                    return;
+                }
+
+                Console.WriteLine($"Successfully generated API to location: {generatedApiOutputPath}!");
             }
             catch (Exception e)
             {

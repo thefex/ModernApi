@@ -1,10 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
-using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.MSBuild;
 using Microsoft.CodeAnalysis.Text;
 using ModernApiGenerator.Core.Data.CodeGen;
@@ -13,54 +10,74 @@ using ModernApiGenerator.Core.Data.Responses.Base;
 
 namespace ModernApiGenerator.Core.GeneratorOutput
 {
-	public class ApiCodeGeneratorProjectFactory
-	{
-		private readonly OutputProjectConfiguration _projectConfig;
+    public class ApiCodeGeneratorProjectGenerator
+    {
+        private readonly OutputProjectConfiguration _projectConfig;
 
-		public ApiCodeGeneratorProjectFactory(OutputProjectConfiguration projectConfig)
-		{
-			_projectConfig = projectConfig;
-		}
+        public ApiCodeGeneratorProjectGenerator(OutputProjectConfiguration projectConfig)
+        {
+            _projectConfig = projectConfig;
+        }
 
-		public async Task<Response> CreateProject(ApiGeneratorResponse generatorResponse)
-		{
-            string[] names = typeof(ApiCodeGeneratorProjectFactory).Assembly.GetManifestResourceNames();
-            ExtractEmbeddedResource(_projectConfig.OutputPath, string.Empty, new List<string>()
-		    {
-		        "ModernApi.Template.NetCore.csproj",
-		        "ModernApi.Template.NetCore.nuget.targets",
-		        "project.json",
-		        "project.lock.json"
-		    });
-		    ExtractEmbeddedResource(Path.Combine(_projectConfig.OutputPath, "Properties"), string.Empty, new List<string>()
-		    {
-		        "AssemblyInfo.cs"
-		    });
+        public async Task<Response> CreateProject(ApiGeneratorResponse generatorResponse)
+        {
+            var names = typeof(ApiCodeGeneratorProjectGenerator).Assembly.GetManifestResourceNames();
+            var resourcesPartOfPath = "";
+            ExtractEmbeddedResource(Path.Combine(_projectConfig.OutputPath, "ModernApi.Template.NetCore"), string.Empty, new List<string>
+            {
+                "ModernApiGenerator.Core.ProjectGeneratorData.ModernApi.Template.NetCore.nuget.targets",
+                "ModernApiGenerator.Core.ProjectGeneratorData.project.json",
+                "ModernApiGenerator.Core.ProjectGeneratorData.project.lock.json",
+                "ModernApiGenerator.Core.ProjectGeneratorData.ModernApi.Template.NetCore.csproj"
+            });
+            ExtractEmbeddedResource(Path.Combine(_projectConfig.OutputPath, "ModernApi.Template.NetCore", "Properties"), string.Empty,
+                new List<string>
+                {
+                    "ModernApiGenerator.Core.ProjectGeneratorData.Properties.AssemblyInfo.cs"
+                });
+            ExtractEmbeddedResource(Path.Combine(_projectConfig.OutputPath, "Sln"), string.Empty, new List<string>()
+            {
+                "ModernApiGenerator.Core.ProjectGeneratorData.ModernApi.Template.sln"
+            });
 
-		    var workspace = MSBuildWorkspace.Create();
-		    var project = await workspace.OpenProjectAsync(Path.Combine(_projectConfig.OutputPath, "ModernApi.Template.NetCore.csproj"));
+
+            var workspace = MSBuildWorkspace.Create();
+            var solution =
+                await workspace.OpenSolutionAsync(Path.Combine(_projectConfig.OutputPath, "Sln", "ModernApi.Template.sln"));
+
+            var project =
+                solution.Projects.First();
+
 
             foreach (var generatedCode in generatorResponse.CSharpCodeOutput)
             {
                 var generatedCodeSourceText = SourceText.From(generatedCode.CSharpCode);
-                var generatedCodeDocument = project.AddDocument(generatedCode.Name, generatedCodeSourceText);
-
+                var generatedCodeDocument = project.AddDocument(generatedCode.Name, generatedCodeSourceText, generatedCode.Namespace.Split('.').ToList());
                 
+                project = generatedCodeDocument.Project;
             }
 
-            return null;
+            if (!workspace.TryApplyChanges(project.Solution))
+                return new Response().AddErrorMessage("Adding generated classes/interfaces files to new solution failed.");
+
+            return new Response();
         }
-		
+
 
         private static void ExtractEmbeddedResource(string outputDir, string resourceLocation, IEnumerable<string> files)
         {
-            foreach (string file in files)
+            foreach (var file in files)
             {
-                using (System.IO.Stream stream = typeof(ApiCodeGeneratorProjectFactory).Assembly.GetManifestResourceStream(resourceLocation + @"." + file))
+                using (var stream = typeof(ApiCodeGeneratorProjectGenerator).Assembly.GetManifestResourceStream(file))
                 {
-                    using (System.IO.FileStream fileStream = new System.IO.FileStream(System.IO.Path.Combine(outputDir, file), System.IO.FileMode.Create))
+                    if (!Directory.Exists(outputDir))
+                        Directory.CreateDirectory(outputDir);
+
+                    using (var fileStream = new FileStream(Path.Combine(outputDir, file
+                        .Replace("ModernApiGenerator.Core.ProjectGeneratorData.Properties.", "")
+                        .Replace("ModernApiGenerator.Core.ProjectGeneratorData.", "")), FileMode.Create))
                     {
-                        for (int i = 0; i < stream.Length; i++)
+                        for (var i = 0; i < stream.Length; i++)
                         {
                             fileStream.WriteByte((byte)stream.ReadByte());
                         }
